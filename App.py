@@ -1,22 +1,30 @@
-from tkinter import Tk, Label, Scale
+from tkinter import Tk, Label, Scale, Button
 
 import matplotlib.pyplot as plt
 from PIL import ImageTk, Image, ImageDraw, ImageOps
 import numpy as np
 import time
+
+
+
 class App:
     
     def __init__(self):
 
-        self.currentRotation = 0
-        self.numberOfEmitters = 400
-        self.emittersAngularSpan = 20
-        self.scannerRadius = 160
+        self.currentIteration = 0
+
+        self.startRotation = 0
+        self.numberOfEmitters = 10
+        self.emittersAngularSpan = 90
+        self.rotationDelta = 5
+
+        self.maxDisplayWidth = 400
+        self.maxDisplayHeight = 600
 
 
         self.window = Tk()
         self.window.title('computed tomography scan simulator')
-        self.window.geometry('600x800')
+        self.window.geometry('1024x1024')
 
         self.baseImage = Image.open('example_images/Kolo.jpg')
 
@@ -29,46 +37,74 @@ class App:
         self.baseImage = ImageOps.expand(self.baseImage, border=(100, 100, 100, 100), fill='black')
 
 
-        self.img = ImageTk.PhotoImage(self.baseImage)
+        self.img = ImageTk.PhotoImage(self.resizeToFitLimits(self.baseImage))
         self.imgLabel = Label(self.window, image=self.img)
-        self.imgLabel.pack()
+        self.imgLabel.grid(column=0, row = 0, columnspan=2)
+
+        #place for sinogram
+        self.sinogram = Image.open('example_images/Kolo.jpg')
+        self.sinImg = ImageTk.PhotoImage(self.resizeToFitLimits(self.sinogram))
+        self.sinImgLabel = Label(self.window, image=self.sinImg)
+        self.sinImgLabel.grid(column=2, row = 0, columnspan=2)
 
         self.diagonal=np.sqrt((self.imgHeight*self.imgHeight)+(self.imgWidth*self.imgWidth))/2
+        self.scannerRadius = self.diagonal
 
-        rotationSlider = Scale(self.window, from_=0, to=360, orient='horizontal', label='rotation', command=self.changeRotation)
-        rotationSlider.set(self.currentRotation)
-        radiusSlider = Scale(self.window, from_=self.diagonal, to=(self.imgWidth+200)/2, orient='horizontal', label='radius', command=self.changeScannerRadius)
-        self.scannerRadius=self.diagonal
-        radiusSlider.set(self.scannerRadius)
+        startRotationSlider = Scale(self.window, from_=0, to=360, orient='horizontal', label='initial rotation', command=self.changeRotation)
+        startRotationSlider.set(self.startRotation)
         spanSlider = Scale(self.window, from_=0, to=180, orient='horizontal', label='angular span', command=self.changeEmittersAngularSpan)
         spanSlider.set(self.emittersAngularSpan)
-        countSlider = Scale(self.window, from_=0, to=30, orient='horizontal', label='number of emitters', command=self.changeNumberOfEmitters)
+        countSlider = Scale(self.window, from_=0, to=100, orient='horizontal', label='number of emitters', command=self.changeNumberOfEmitters)
         countSlider.set(self.numberOfEmitters)
+        rotationDeltaSlider = Scale(self.window, from_=0, to=90, orient='horizontal', label='delta of rotation', command=self.changeRotationDelta)
+        rotationDeltaSlider.set(self.rotationDelta)
 
-        rotationSlider.pack()
-        radiusSlider.pack()
-        spanSlider.pack()
-        countSlider.pack()
+        iterationSlider = Scale(self.window, from_=0, to=180, orient='horizontal', label='iteration', command=self.changeIteration)
+        iterationSlider.set(self.currentIteration)
+
+        applyParamsButton = Button(self.window, text="zastosuj i resetuj sinogram" ,command=self.applyParams)
+        nextButton= Button(self.window, text="następna iteracja", command=self.nextIteration)
+
+        startRotationSlider.grid(column=0, row=1)
+        spanSlider.grid(column=2, row=1)
+        countSlider.grid(column=3, row=1)
+        rotationDeltaSlider.grid(column=0, row=2)
+        applyParamsButton.grid(column=1, row=3, columnspan=2)
+        nextButton.grid(column=1, row=4, columnspan=2)
 
         '''from skimage.transform import radon # gotowa funkcja radona z bibilioteki skimage
         sinogram = radon(np.array(self.originalImage.convert('L')), circle=True)
         plt.imshow(sinogram, cmap='gray')
         plt.show()'''
 
+        self.resetSinogram()
         self.updateSensorsDraw()
+
+        
 
         self.window.mainloop()
 
+    def resizeToFitLimits(self, image):
+        newShape = (0 , 0)
+        if image.size[0] > image.size[1]:
+            newShape = (self.maxDisplayWidth, int(self.maxDisplayWidth * (image.size[1] / image.size[0])))
+        else:
+            newShape = (int(self.maxDisplayHeight * (image.size[0] / image.size[1])), self.maxDisplayHeight)
 
+        return image.resize(newShape, resample=Image.BILINEAR)
 
     def loadImage(self, filepath):
         self.baseImage = Image.open(filepath)
-        self.img = ImageTk.PhotoImage(self.baseImage)
+        self.img = ImageTk.PhotoImage(self.resizeToFitLimits(self.baseImage))
         self.imgLabel.config(image=self.img)
 
     def setImage(self, image):
-        self.img = ImageTk.PhotoImage(image)
+        self.img = ImageTk.PhotoImage(self.resizeToFitLimits(image))
         self.imgLabel.config(image=self.img)
+
+    def showSinogram(self, sinogram):
+        self.sinImg = ImageTk.PhotoImage(self.resizeToFitLimits(sinogram))
+        self.sinImgLabel.config(image=self.sinImg)
 
     def processImage(self, image):
         marray = np.array(image)
@@ -103,85 +139,125 @@ class App:
         halfofrange = sensorsRangeRad/2
         gapangle = sensorsRangeRad/(sensorsCount - 1)
 
-        radonmatrix = [] # tablica zawierająca listy (lines) sum każdej linii w danej iteracji (rozmiar = liczba iteracji)
+        radonmatrix = np.zeros((sensorsCount, int(180/self.rotationDelta)))
 
 
-        for j in range(rotation,rotation+180,alpha): # powielanie emiterow(detektorow) co alpha do polowy kola
-            lines = [] # tablica zawierająca znormalizowane sumy każdej linii w danej iteracji (rozmiar = sensorsCount)
-            rotationRad = np.radians(j)
-            rotationRadSym = rotationRad + np.pi
-            #emitters
-            for i in range(sensorsCount):
-                angles[i] = rotationRad - halfofrange + i * gapangle
+        # col = 0
+        # for j in range(rotation,rotation+180,alpha): # powielanie emiterow(detektorow) co alpha do polowy kola
+        #     rotationRad = np.radians(j)
+        #     rotationRadSym = rotationRad + np.pi
+        #     #emitters
+        #     for i in range(sensorsCount):
+        #         angles[i] = rotationRad - halfofrange + i * gapangle
 
-            #detectors
-            for i in range(sensorsCount):
-                angles[i + sensorsCount] = rotationRadSym - halfofrange + i * gapangle
+        #     #detectors
+        #     for i in range(sensorsCount):
+        #         angles[i + sensorsCount] = rotationRadSym - halfofrange + i * gapangle
 
-            cos = np.cos(angles)
-            sin = np.sin(angles)
+        #     cos = np.cos(angles)
+        #     sin = np.sin(angles)
 
-            x = radius * cos + center[0]
-            y = radius * sin + center[1]
+        #     x = radius * cos + center[0]
+        #     y = radius * sin + center[1]
 
-            pointSize = 3
-            pairs=[]
-            #emitters - BLUE
-            for i in range(sensorsCount):
-                drawable.ellipse((x[i]-pointSize, y[i]-pointSize, x[i] + pointSize, y[i] + pointSize), fill=(0,0,255))
-                pairs.append([int(x[i]),int(y[i])])
-            #detectors
-            temp=0
-            for i in range(len(x)-1, sensorsCount-1,-1):
-                pairs[temp].append(int(x[i]))
-                pairs[temp].append(int(y[i]))
-                temp+=1
-                drawable.ellipse((x[i]-pointSize, y[i]-pointSize, x[i] + pointSize, y[i] + pointSize), fill=(255,100,20))
-            for i in pairs:
+        #     pointSize = 3
+        #     pairs=[]
+        #     #emitters - BLUE
+        #     for i in range(sensorsCount):
+        #         drawable.ellipse((x[i]-pointSize, y[i]-pointSize, x[i] + pointSize, y[i] + pointSize), fill=(0,0,255))
+        #         pairs.append([int(x[i]),int(y[i])])
+        #     #detectors
+        #     temp=0
+        #     for i in range(len(x)-1, sensorsCount-1,-1):
+        #         pairs[temp].append(int(x[i]))
+        #         pairs[temp].append(int(y[i]))
+        #         temp+=1
+        #         drawable.ellipse((x[i]-pointSize, y[i]-pointSize, x[i] + pointSize, y[i] + pointSize), fill=(255,100,20))
 
-                points = self.bresenham_integer(*i)
-                for point in points:
-                    drawable.ellipse((point[0]-1 , point[1]-1 , point[0]+1 , point[1]+1),
-                                     fill=(100, 200, 100))
-                lines.append(self.sumPixels(points,self.baseImage.copy()))
+        #     row = 0
+        #     for i in pairs:
+        #         points = self.bresenham_integer(*i)
+        #         for point in points:
+        #             drawable.ellipse((point[0]-1 , point[1]-1 , point[0]+1 , point[1]+1),
+        #                              fill=(100, 200, 100))
+        #         self.radonmatrix[row, col] = self.sumPixels(points,self.baseImage.copy())
+        #         row += 1
+        #     col += 1
 
-            radonmatrix.append(lines)
-        import matplotlib.pyplot as plt
+        rotationRad = np.radians((rotation + self.currentIteration * int(180/self.rotationDelta)))
+        rotationRadSym = rotationRad + np.pi
+        #emitters
+        for i in range(sensorsCount):
+            angles[i] = rotationRad - halfofrange + i * gapangle
 
-        # Plot the sinogram
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4.5))
-        ax1.set_title("Original")
-        ax1.imshow(self.baseImage, cmap=plt.cm.Greys_r)
+        #detectors
+        for i in range(sensorsCount):
+            angles[i + sensorsCount] = rotationRadSym - halfofrange + i * gapangle
 
-        ax2.set_title("Sinogram")
-        ax2.set_xlabel("Projection angle (degrees)")
-        ax2.set_ylabel("Projection position (pixels)")
-        ax2.imshow(radonmatrix, cmap=plt.cm.Greys_r,
-                   extent=(0,180, 0, np.array(radonmatrix).shape[0]), aspect='auto')
+        cos = np.cos(angles)
+        sin = np.sin(angles)
 
-        plt.show()
+        x = radius * cos + center[0]
+        y = radius * sin + center[1]
+
+        pointSize = 3
+        pairs=[]
+        #emitters - BLUE
+        for i in range(sensorsCount):
+            drawable.ellipse((x[i]-pointSize, y[i]-pointSize, x[i] + pointSize, y[i] + pointSize), fill=(0,0,255))
+            pairs.append([int(x[i]),int(y[i])])
+        #detectors
+        temp=0
+        for i in range(len(x)-1, sensorsCount-1,-1):
+            pairs[temp].append(int(x[i]))
+            pairs[temp].append(int(y[i]))
+            temp+=1
+            drawable.ellipse((x[i]-pointSize, y[i]-pointSize, x[i] + pointSize, y[i] + pointSize), fill=(255,100,20))
+
+        row = 0
+        for i in pairs:
+            points = self.bresenham_integer(*i)
+            for point in points:
+                drawable.ellipse((point[0]-1 , point[1]-1 , point[0]+1 , point[1]+1),
+                                    fill=(100, 200, 100))
+            self.radonmatrix[row, self.currentIteration] = self.sumPixels(points,self.baseImage.copy())
+            row += 1
+        
+        self.showSinogram(Image.fromarray(self.radonmatrix))
         self.setImage(drawable._image)
 
 
 
-
     def updateSensorsDraw(self):
-        self.drawSensors(self.scannerRadius, self.currentRotation, self.numberOfEmitters, self.emittersAngularSpan)
+        self.drawSensors(self.scannerRadius, self.startRotation, self.numberOfEmitters, self.emittersAngularSpan)
 
     def changeRotation(self, event):
-        self.currentRotation = int(event)
-        self.updateSensorsDraw()
-
-    def changeScannerRadius(self, event):
-        self.scannerRadius = int(event)
-        self.updateSensorsDraw()
+        self.startRotation = int(event)
 
     def changeNumberOfEmitters(self, event):
         self.numberOfEmitters = int(event)
-        self.updateSensorsDraw()
 
     def changeEmittersAngularSpan(self, event):
         self.emittersAngularSpan = int(event)
+
+    def changeIteration(self, event):
+        self.currentIteration = int(event)
+
+    def changeRotationDelta(self, event):
+        self.rotationDelta = int(event)
+
+    def applyParams(self):
+        self.resetSinogram();
+
+
+    def resetSinogram(self):
+        self.currentIteration = 0
+        self.radonmatrix = np.zeros((self.numberOfEmitters, int(180/self.rotationDelta))) # macierz do której stopniowo zapisywany jet sinogram  pod indeksem [indeks emitera, iteracja obrotu] znajduje się znormalizowana suma wartości pikseli na linii emiter-detektor
+        self.updateSensorsDraw()
+        self.showSinogram(Image.fromarray(self.radonmatrix))
+
+    def nextIteration(self):
+        self.currentIteration += 1
         self.updateSensorsDraw()
 
     def bresenham_integer(self, x0, y0, x1, y1): # wyznaczanie linii
