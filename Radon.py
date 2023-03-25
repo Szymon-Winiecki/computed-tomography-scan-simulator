@@ -164,8 +164,8 @@ class Radon:
             # emitters and detectors
             for i in range(self.numberOfEmitters):
                 points = self.bresenham(int(x[i]), int(y[i]), int(x[last - i]), int(y[last - i]))
-                for pos, xpoint in enumerate(points[0]):
-                    self.reconstrImage[xpoint, points[1][pos]] += self.radonmatrix[i, iter]
+                for xpoint, ypoint in zip(points[0],points[1]):
+                    self.reconstrImage[xpoint, ypoint] += self.radonmatrix[i, iter]
 
             self.currentIteration += 1
 
