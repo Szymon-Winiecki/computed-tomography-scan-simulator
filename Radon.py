@@ -2,17 +2,20 @@ from PIL import ImageTk, Image, ImageDraw, ImageOps
 import numpy as np
 import time
 
+
 class Radon:
 
-    def __init__(self, baseImage, startRotation = 0, numberOfEmitters = 10, emittersAngularSpan = 1.57075, rotationDelta = 0.04363):
-        
+    def __init__(self, baseImage, startRotation=0, numberOfEmitters=10, emittersAngularSpan=1.57075,
+                 rotationDelta=0.04363):
+
         self.baseImage = baseImage
         self.baseImageL = baseImage.convert('L')
         self.baseImageArray = np.array(self.baseImageL)
 
-        self.configAndReset(startRotation=startRotation, numberOfEmitters=numberOfEmitters, emittersAngularSpan=emittersAngularSpan, rotationDelta=rotationDelta)
+        self.configAndReset(startRotation=startRotation, numberOfEmitters=numberOfEmitters,
+                            emittersAngularSpan=emittersAngularSpan, rotationDelta=rotationDelta)
 
-    def configAndReset(self, startRotation = None, numberOfEmitters = None, emittersAngularSpan = None, rotationDelta = None):
+    def configAndReset(self, startRotation=None, numberOfEmitters=None, emittersAngularSpan=None, rotationDelta=None):
         if startRotation != None:
             self.startRotation = startRotation
         if numberOfEmitters != None:
@@ -22,7 +25,6 @@ class Radon:
         if rotationDelta != None:
             self.rotationDelta = rotationDelta
 
-
         self.currentIteration = 0
         self.numberOfIterations = int(np.pi / rotationDelta)
         self.radonmatrix = np.zeros((self.numberOfEmitters, self.numberOfIterations))
@@ -31,6 +33,8 @@ class Radon:
         imgWidth = self.baseImage.size[0]
         imgHeight = self.baseImage.size[1]
 
+        self.reconstrImage = np.zeros((imgWidth, imgHeight)) # reconstrukcja obrazu z sinogramu
+
         self.imageDiagonal = np.sqrt((imgWidth * imgWidth) + (imgHeight * imgHeight))
 
         self.scannerRadius = int(self.imageDiagonal / 2)
@@ -38,16 +42,16 @@ class Radon:
         self.imageCenter = (self.baseImage.size[0] / 2, self.baseImage.size[1] / 2)
         self.angles = np.zeros(self.numberOfEmitters * 2)
         self.halfOfSpan = self.emittersAngularSpan / 2
-        self.angleGapBetweenSensors = self.emittersAngularSpan/(self.numberOfEmitters - 1)
+        self.angleGapBetweenSensors = self.emittersAngularSpan / (self.numberOfEmitters - 1)
 
     def reset(self):
         self.configAndReset()
 
-    #returns current state of sinogram
+    # returns current state of sinogram
     def getSinogram(self):
         return Image.fromarray(self.radonmatrixNorm)
 
-    #calculates sinogram from 'from_iteration' inclusive to 'to_iteration' exclusive
+    # calculates sinogram using Radon Transform from 'from_iteration' inclusive to 'to_iteration' exclusive
     def generateSinogram(self, from_iteration=None, to_iteration=None):
 
         s_time = time.time()
@@ -60,13 +64,13 @@ class Radon:
         if from_iteration >= self.numberOfIterations or to_iteration > self.numberOfIterations:
             return
 
-        #current roation of all emitters (indices from 0 to self.numberOfEmitters - 1) and detectors (indices from self.numberOfEmitters to 2*self.numberOfEmitters - 1) in radians
+        # current roation of all emitters (indices from 0 to self.numberOfEmitters - 1) and detectors (indices from self.numberOfEmitters to 2*self.numberOfEmitters - 1) in radians
         rotation = np.arange(self.numberOfEmitters)
         rotation = np.concatenate((rotation, rotation))
 
         initRotation = self.startRotation + (from_iteration - 1) * self.rotationDelta - self.halfOfSpan
         rotation = rotation * self.angleGapBetweenSensors + initRotation
-        rotation[self.numberOfEmitters : ] += np.pi
+        rotation[self.numberOfEmitters:] += np.pi
 
         for iter in range(from_iteration, to_iteration):
             rotation += self.rotationDelta
@@ -75,23 +79,25 @@ class Radon:
             y = self.scannerRadius * np.sin(rotation) + self.imageCenter[1]
 
             last = len(x) - 1
-            #emitters and detectors
+            # emitters and detectors
             for i in range(self.numberOfEmitters):
-                points = self.bresenham_integer(int(x[i]), int(y[i]), int(x[last - i]), int(y[last - i]))
+                points = self.bresenham(int(x[i]), int(y[i]), int(x[last - i]), int(y[last - i]))
                 self.radonmatrix[i, iter] = self.sumPixels(points, self.baseImageArray)
+            last = len(x) - 1
 
             self.currentIteration += 1
-        
-        self.radonmatrixNorm = self.radonmatrix / (np.max(self.radonmatrix) / 255)
 
+        # normalizacja
+        self.radonmatrixNorm = self.radonmatrix / (np.max(self.radonmatrix) / 255)
         print(time.time() - s_time)
 
     def nextIteration(self, count=1):
         self.generateSinogram(to_iteration=self.currentIteration + count + 1)
 
-    def bresenham_integer(self, x0, y0, x1, y1): # wyznaczanie linii
+    def bresenham(self, x0, y0, x1, y1):  # wyznaczanie linii
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
+        # wybieranie znaku dla x i y
         if x0 > x1:
             sx = -1
         else:
@@ -103,8 +109,8 @@ class Radon:
 
         err = dx - dy
 
-        w =  self.baseImage.size[0]
-        h =  self.baseImage.size[1]
+        w = self.baseImage.size[0]
+        h = self.baseImage.size[1]
 
         x = []
         y = []
@@ -125,6 +131,43 @@ class Radon:
             y.append(y0)
         return [x, y]
 
-
-    def sumPixels(self, points, imageArray): # sumowanie wartości pikseli w linii
+    def sumPixels(self, points, imageArray):  # sumowanie wartości pikseli w linii
         return np.sum(imageArray[points[0], points[1]])
+
+    def getReconstruction(self):
+        return Image.fromarray(self.reconstrImage)
+    # calculates image reconstruction using Inverse Radon Transform
+    def generateReconstruction(self, from_iteration=None, to_iteration=None):
+        if from_iteration == None:
+            from_iteration = self.currentIteration
+        if to_iteration == None:
+            to_iteration = self.numberOfIterations
+
+        if from_iteration >= self.numberOfIterations or to_iteration > self.numberOfIterations:
+            return
+
+        # current roation of all emitters (indices from 0 to self.numberOfEmitters - 1) and detectors (indices from self.numberOfEmitters to 2*self.numberOfEmitters - 1) in radians
+        rotation = np.arange(self.numberOfEmitters)
+        rotation = np.concatenate((rotation, rotation))
+
+        initRotation = self.startRotation + (from_iteration - 1) * self.rotationDelta - self.halfOfSpan
+        rotation = rotation * self.angleGapBetweenSensors + initRotation
+        rotation[self.numberOfEmitters:] += np.pi
+
+        for iter in range(from_iteration, to_iteration):
+            rotation += self.rotationDelta
+
+            x = self.scannerRadius * np.cos(rotation) + self.imageCenter[0]
+            y = self.scannerRadius * np.sin(rotation) + self.imageCenter[1]
+
+            last = len(x) - 1
+            # emitters and detectors
+            for i in range(self.numberOfEmitters):
+                points = self.bresenham(int(x[i]), int(y[i]), int(x[last - i]), int(y[last - i]))
+                for pos, xpoint in enumerate(points[0]):
+                    self.reconstrImage[xpoint, points[1][pos]] += self.radonmatrix[i, iter]
+
+            self.currentIteration += 1
+
+        # normalizacja
+        self.reconstrImage = 255 * self.reconstrImage / np.max(self.reconstrImage)

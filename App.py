@@ -7,8 +7,9 @@ import time
 
 from Radon import Radon
 
+
 class App:
-    
+
     def __init__(self):
         self.startRotation = 0
         self.numberOfEmitters = 10
@@ -17,7 +18,6 @@ class App:
 
         self.maxImageDisplayWidth = 400
         self.maxImageDisplayHeight = 600
-
 
         self.window = Tk()
         self.window.title('computed tomography scan simulator')
@@ -32,24 +32,34 @@ class App:
 
         self.img = ImageTk.PhotoImage(self.resizeToFitLimits(self.baseImage))
         self.imgLabel = Label(self.window, image=self.img)
-        self.imgLabel.grid(column=0, row = 0, columnspan=2)
+        self.imgLabel.grid(column=0, row=0, columnspan=2)
 
-        #place for sinogram
+        # place for sinogram
         self.sinogram = Image.open('example_images/blank.png')
         self.sinImg = ImageTk.PhotoImage(self.resizeToFitLimits(self.sinogram))
         self.sinImgLabel = Label(self.window, image=self.sinImg)
-        self.sinImgLabel.grid(column=2, row = 0, columnspan=2)
+        self.sinImgLabel.grid(column=2, row=0, columnspan=2)
 
-        startRotationSlider = Scale(self.window, from_=0, to=360, orient='horizontal', label='początkowa rotacja', command=self.changeRotation)
+        # place for reconstructed image
+        self.recImage = Image.open('example_images/blank.png')
+        self.recImg = ImageTk.PhotoImage(self.resizeToFitLimits(self.recImage))
+        self.recImgLabel = Label(self.window, image=self.recImg)
+        self.recImgLabel.grid(column=4, row=0, columnspan=2)
+
+        startRotationSlider = Scale(self.window, from_=0, to=360, orient='horizontal', label='początkowa rotacja',
+                                    command=self.changeRotation)
         startRotationSlider.set(self.startRotation)
-        spanSlider = Scale(self.window, from_=0, to=180, orient='horizontal', label='angular span', command=self.changeEmittersAngularSpan)
+        spanSlider = Scale(self.window, from_=0, to=180, orient='horizontal', label='angular span',
+                           command=self.changeEmittersAngularSpan)
         spanSlider.set(self.emittersAngularSpan)
-        countSlider = Scale(self.window, from_=0, to=100, orient='horizontal', label='ilość emiterów', command=self.changeNumberOfEmitters)
+        countSlider = Scale(self.window, from_=0, to=400, orient='horizontal', label='ilość emiterów',
+                            command=self.changeNumberOfEmitters)
         countSlider.set(self.numberOfEmitters)
-        rotationDeltaSlider = Scale(self.window, from_=0, to=90, orient='horizontal', label='Δα', command=self.changeRotationDelta)
+        rotationDeltaSlider = Scale(self.window, from_=0, to=90, orient='horizontal', label='Δα',
+                                    command=self.changeRotationDelta)
         rotationDeltaSlider.set(self.rotationDelta)
 
-        applyParamsButton = Button(self.window, text="zastosuj i resetuj sinogram" ,command=self.applyParams)
+        applyParamsButton = Button(self.window, text="zastosuj i resetuj sinogram", command=self.applyParams)
 
         startRotationSlider.grid(column=0, row=1)
         spanSlider.grid(column=1, row=1)
@@ -57,17 +67,12 @@ class App:
         rotationDeltaSlider.grid(column=0, row=2)
         applyParamsButton.grid(column=1, row=3)
 
-        '''from skimage.transform import radon # gotowa funkcja radona z bibilioteki skimage
-        sinogram = radon(np.array(self.originalImage.convert('L')), circle=True)
-        plt.imshow(sinogram, cmap='gray')
-        plt.show()'''
-
         self.radonTransformator = Radon(self.baseImage)
 
         self.window.mainloop()
 
     def resizeToFitLimits(self, image):
-        newShape = (0 , 0)
+        newShape = (0, 0)
         if image.size[0] > image.size[1]:
             newShape = (self.maxImageDisplayHeight, int(self.maxImageDisplayHeight * (image.size[1] / image.size[0])))
         else:
@@ -88,6 +93,10 @@ class App:
         self.sinImg = ImageTk.PhotoImage(self.resizeToFitLimits(sinogram))
         self.sinImgLabel.config(image=self.sinImg)
 
+    def showReconstruction(self, reconstruction):
+        self.recImg = ImageTk.PhotoImage(self.resizeToFitLimits(reconstruction))
+        self.recImgLabel.config(image=self.recImg)
+
     def changeRotation(self, event):
         self.startRotation = int(event)
 
@@ -104,9 +113,14 @@ class App:
         self.rotationDelta = int(event)
 
     def applyParams(self):
-        self.radonTransformator.configAndReset(startRotation=np.radians(self.startRotation), numberOfEmitters=self.numberOfEmitters, emittersAngularSpan=np.radians(self.emittersAngularSpan), rotationDelta=np.radians(self.rotationDelta))
+        self.radonTransformator.configAndReset(startRotation=np.radians(self.startRotation),
+                                               numberOfEmitters=self.numberOfEmitters,
+                                               emittersAngularSpan=np.radians(self.emittersAngularSpan),
+                                               rotationDelta=np.radians(self.rotationDelta))
         self.radonTransformator.generateSinogram()
         self.showSinogram(self.radonTransformator.getSinogram())
+        self.radonTransformator.generateReconstruction(from_iteration=0)  # rekonstrukcja obrazu
+        self.showReconstruction(self.radonTransformator.getReconstruction())
 
     # def nextIteration(self):
     #     self.radonTransformator.nextIteration()
