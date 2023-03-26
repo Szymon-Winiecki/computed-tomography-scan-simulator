@@ -63,7 +63,7 @@ class App:
         countSlider = Scale(self.window, from_=0, to=400, orient='horizontal', label='ilość emiterów',
                             command=self.changeNumberOfEmitters)
         countSlider.set(self.numberOfEmitters)
-        rotationDeltaSlider = Scale(self.window, from_=0, to=90, orient='horizontal', label='Δα',
+        rotationDeltaSlider = Scale(self.window, from_=1, to=90, orient='horizontal', label='Δα',
                                     command=self.changeRotationDelta)
         rotationDeltaSlider.set(self.rotationDelta)
 
