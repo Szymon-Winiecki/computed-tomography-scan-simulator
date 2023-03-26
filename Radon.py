@@ -1,4 +1,4 @@
-from PIL import ImageTk, Image, ImageDraw, ImageOps
+from PIL import Image
 import numpy as np
 import time
 
@@ -6,16 +6,16 @@ import time
 class Radon:
 
     def __init__(self, baseImage, startRotation=0, numberOfEmitters=10, emittersAngularSpan=1.57075,
-                 rotationDelta=0.04363):
+                 rotationDelta=0.04363, useFilter=False):
 
         self.baseImage = baseImage
         self.baseImageL = baseImage.convert('L')
         self.baseImageArray = np.array(self.baseImageL)
 
         self.configAndReset(startRotation=startRotation, numberOfEmitters=numberOfEmitters,
-                            emittersAngularSpan=emittersAngularSpan, rotationDelta=rotationDelta)
+                            emittersAngularSpan=emittersAngularSpan, rotationDelta=rotationDelta, useFilter=useFilter)
 
-    def configAndReset(self, startRotation=None, numberOfEmitters=None, emittersAngularSpan=None, rotationDelta=None):
+    def configAndReset(self, startRotation=None, numberOfEmitters=None, emittersAngularSpan=None, rotationDelta=None, useFilter=None):
         if startRotation != None:
             self.startRotation = startRotation
         if numberOfEmitters != None:
@@ -24,8 +24,11 @@ class Radon:
             self.emittersAngularSpan = emittersAngularSpan
         if rotationDelta != None:
             self.rotationDelta = rotationDelta
+        if useFilter != None:
+            self.useFilter = useFilter
 
-        self.currentIteration = 0
+        self.currentSinogramIteration = 0
+        self.currentReconstructionIteration = 0
         self.numberOfIterations = int(np.pi / rotationDelta)
         self.radonmatrix = np.zeros((self.numberOfEmitters, self.numberOfIterations))
         self.radonmatrixNorm = np.zeros((self.numberOfEmitters, self.numberOfIterations))
@@ -34,6 +37,7 @@ class Radon:
         imgHeight = self.baseImage.size[1]
 
         self.reconstrImage = np.zeros((imgWidth, imgHeight)) # reconstrukcja obrazu z sinogramu
+        self.reconstrImageNorm = np.zeros((imgWidth, imgHeight)) # reconstrukcja obrazu z sinogramu
 
         self.imageDiagonal = np.sqrt((imgWidth * imgWidth) + (imgHeight * imgHeight))
 
@@ -51,12 +55,12 @@ class Radon:
         return Image.fromarray(self.radonmatrixNorm)
 
     # calculates sinogram using Radon Transform from 'from_iteration' inclusive to 'to_iteration' exclusive
-    def generateSinogram(self, from_iteration=None, to_iteration=None, filter=True):
+    def generateSinogram(self, from_iteration=None, to_iteration=None):
 
         s_time = time.time()
 
         if from_iteration == None:
-            from_iteration = self.currentIteration
+            from_iteration = self.currentSinogramIteration
         if to_iteration == None:
             to_iteration = self.numberOfIterations
 
@@ -67,7 +71,7 @@ class Radon:
         rotation = np.arange(self.numberOfEmitters)
         rotation = np.concatenate((rotation, rotation))
 
-        initRotation = self.startRotation + (from_iteration - 1) * self.rotationDelta - self.halfOfSpan
+        initRotation = self.startRotation + from_iteration * self.rotationDelta - self.halfOfSpan
         rotation = rotation * self.angleGapBetweenSensors + initRotation
         rotation[self.numberOfEmitters:] += np.pi
 
@@ -84,16 +88,24 @@ class Radon:
                 self.radonmatrix[i, iter] = self.sumPixels(points, self.baseImageArray)
             last = len(x) - 1
 
-            self.currentIteration += 1
+            self.currentSinogramIteration += 1
 
-        # normalizacja
-        if filter:
-            self.radonmatrix = self.filter(self.radonmatrix)
-        self.radonmatrixNorm = self.radonmatrix / (np.max(self.radonmatrix) / 255)
+        if self.useFilter:
+            tmpRadon = self.filter(self.radonmatrix)
+        else:
+            tmpRadon = self.radonmatrix.copy()
+        self.radonmatrixNorm = tmpRadon / (np.max(tmpRadon) / 255)
         print("sinogram: ", (time.time() - s_time))
 
     def nextIteration(self, count=1):
-        self.generateSinogram(to_iteration=self.currentIteration + count + 1)
+        prev = self.currentSinogramIteration
+        self.generateSinogram(to_iteration=self.currentSinogramIteration + count)
+        return self.currentSinogramIteration - prev
+    
+    def nextReconstructionIteration(self, count=1):
+        prev = self.currentReconstructionIteration
+        self.generateReconstruction(to_iteration=self.currentReconstructionIteration + count)
+        return self.currentReconstructionIteration - prev
 
     def bresenham(self, x0, y0, x1, y1):  # wyznaczanie linii
         dx = abs(x1 - x0)
@@ -115,10 +127,14 @@ class Radon:
 
         x = []
         y = []
+        added = False
         while x0 != x1 or y0 != y1:
-            if x0 > 0 and x0 < w and y0 > 0 and y0 < h:
+            if x0 >= 0 and x0 < w and y0 >= 0 and y0 < h:
                 x.append(x0)
                 y.append(y0)
+                added = True
+            elif added: # linia 'wyszła' poza obrazek, żaden piksel nie spełni już warunku ifa powyżej, więc można skończyć
+                break
             e2 = err * 2
             if e2 > -dy:
                 err -= dy
@@ -136,7 +152,7 @@ class Radon:
         return np.sum(imageArray[points[0], points[1]])
 
     def getReconstruction(self):
-        return Image.fromarray(self.reconstrImage)
+        return Image.fromarray(self.reconstrImageNorm)
     
     # calculates image reconstruction using Inverse Radon Transform
     def generateReconstruction(self, from_iteration=None, to_iteration=None):
@@ -144,7 +160,7 @@ class Radon:
         s_time = time.time()
 
         if from_iteration == None:
-            from_iteration = self.currentIteration
+            from_iteration = self.currentReconstructionIteration
         if to_iteration == None:
             to_iteration = self.numberOfIterations
 
@@ -171,10 +187,10 @@ class Radon:
                 points = self.bresenham(int(x[i]), int(y[i]), int(x[last - i]), int(y[last - i]))
                 self.reconstrImage[points[0], points[1]] += self.radonmatrixNorm[i, iter]
 
-            self.currentIteration += 1
+            self.currentReconstructionIteration += 1
 
         # normalizacja
-        self.reconstrImage = 255 * self.reconstrImage / np.max(self.reconstrImage)
+        self.reconstrImageNorm = 255 * self.reconstrImage / np.max(self.reconstrImage)
 
         print("reconstruction: ", (time.time() - s_time))
 
@@ -190,12 +206,13 @@ class Radon:
         return 2 * np.real(np.fft.fft(f))
 
     def filter(self, sinogram):
-        rlf = self.rampFilter(sinogram.shape[1])
-        for i in range(sinogram.shape[0]):
-            f = np.fft.fft(sinogram[i, :]) * rlf
-            sinogram[i, :] = np.real(np.fft.ifft(f))
+        filtered = sinogram.copy()
+        rlf = self.rampFilter(filtered.shape[0])
+        for i in range(filtered.shape[1]):
+            f = np.fft.fft(filtered[:, i]) * rlf
+            filtered[:, i] = np.real(np.fft.ifft(f))
 
-        return sinogram
+        return filtered
     
     
 

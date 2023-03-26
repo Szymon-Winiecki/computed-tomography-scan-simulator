@@ -1,4 +1,4 @@
-from tkinter import Tk, Label, Scale, Button, Text
+from tkinter import Tk, Label, Scale, Button, Text, Checkbutton
 
 import matplotlib.pyplot as plt
 from PIL import ImageTk, Image, ImageDraw, ImageOps
@@ -22,6 +22,7 @@ class App:
         self.numberOfEmitters = 10
         self.emittersAngularSpan = 90
         self.rotationDelta = 5
+        self.useFilter = True
 
         self.maxImageDisplayWidth = 400
         self.maxImageDisplayHeight = 600
@@ -60,15 +61,24 @@ class App:
         spanSlider = Scale(self.window, from_=0, to=180, orient='horizontal', label='angular span',
                            command=self.changeEmittersAngularSpan)
         spanSlider.set(self.emittersAngularSpan)
-        countSlider = Scale(self.window, from_=0, to=400, orient='horizontal', label='ilość emiterów',
+        countSlider = Scale(self.window, from_=0, to=1000, resolution=2, orient='horizontal', label='ilość emiterów',
                             command=self.changeNumberOfEmitters)
         countSlider.set(self.numberOfEmitters)
-        rotationDeltaSlider = Scale(self.window, from_=1, to=90, orient='horizontal', label='Δα',
+        rotationDeltaSlider = Scale(self.window, from_=0.5, to=90, resolution=0.5, orient='horizontal', label='Δα',
                                     command=self.changeRotationDelta)
         rotationDeltaSlider.set(self.rotationDelta)
 
-        # Button to create sinogram and reconstr
+        filterCheckBox = Checkbutton(self.window, text='filtruj sinogram', onvalue=1, offvalue=0, command=self.changeFilter)
+        filterCheckBox.select()
+
+        # Button to apply settings and reset generated images
         applyParamsButton = Button(self.window, text="zastosuj i resetuj sinogram", command=self.applyParams)
+
+        # Button to create entire sinogram and reconstr
+        generateButton = Button(self.window, text="Wygeneruj", command=self.generateSinogram)
+
+        # Button to render next iteration
+        nextIterationButton = Button(self.window, text="rysuj iteracyjnie", command=self.runAnimation)
 
         # Textboxes - nie maja sprawdzania poprawnosci ani nic
         namelabel = Label(self.window, text = "Patient Name")
@@ -90,6 +100,7 @@ class App:
         spanSlider.grid(column=1, row=1)
         countSlider.grid(column=2, row=1)
         rotationDeltaSlider.grid(column=0, row=2)
+        filterCheckBox.grid(column=1, row=2)
 
         namelabel.grid(column=0,row=4)
         self.nametxt.grid(column=0, row=5)
@@ -102,7 +113,9 @@ class App:
 
 
 
-        applyParamsButton.grid(column=1, row=3)
+        applyParamsButton.grid(column=2, row=3)
+        generateButton.grid(column=2, row=4)
+        nextIterationButton.grid(column=2, row=5)
 
         self.radonTransformator = Radon(self.baseImage)
 
@@ -111,9 +124,9 @@ class App:
     def resizeToFitLimits(self, image):
         newShape = (0, 0)
         if image.size[0] > image.size[1]:
-            newShape = (self.maxImageDisplayHeight, int(self.maxImageDisplayHeight * (image.size[1] / image.size[0])))
+            newShape = (self.maxImageDisplayHeight, int(self.maxImageDisplayHeight * (image.size[1] / image.size[0])) + 1)
         else:
-            newShape = (int(self.maxImageDisplayWidth * (image.size[0] / image.size[1])), self.maxImageDisplayWidth)
+            newShape = (int(self.maxImageDisplayWidth * (image.size[0] / image.size[1])) + 1, self.maxImageDisplayWidth)
 
         return image.resize(newShape, resample=Image.BICUBIC)
 
@@ -147,13 +160,21 @@ class App:
         self.currentIteration = int(event)
 
     def changeRotationDelta(self, event):
-        self.rotationDelta = int(event)
+        self.rotationDelta = float(event)
+
+    def changeFilter(self):
+        self.useFilter = not self.useFilter
 
     def applyParams(self):
         self.radonTransformator.configAndReset(startRotation=np.radians(self.startRotation),
                                                numberOfEmitters=self.numberOfEmitters,
                                                emittersAngularSpan=np.radians(self.emittersAngularSpan),
-                                               rotationDelta=np.radians(self.rotationDelta))
+                                               rotationDelta=np.radians(self.rotationDelta),
+                                               useFilter=self.useFilter)
+        self.showSinogram(self.radonTransformator.getSinogram())
+        self.showReconstruction(self.radonTransformator.getReconstruction())
+
+    def generateSinogram(self):
         self.radonTransformator.generateSinogram()
         self.showSinogram(self.radonTransformator.getSinogram())
         self.radonTransformator.generateReconstruction(from_iteration=0)  # rekonstrukcja obrazu
@@ -161,8 +182,16 @@ class App:
 
         self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
 
-    # def nextIteration(self):
-    #     self.radonTransformator.nextIteration()
+    def runAnimation(self):
+        while self.radonTransformator.nextIteration() > 0:
+            self.showSinogram(self.radonTransformator.getSinogram())
+            self.window.update()
+
+        while self.radonTransformator.nextReconstructionIteration() > 0:
+            self.showReconstruction(self.radonTransformator.getReconstruction())
+            self.window.update()
+
+        self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
 
     def createDicom(self):
         patient_data = {}
