@@ -1,4 +1,5 @@
-from tkinter import Tk, Label, Scale, Button, Text, Checkbutton
+from tkinter import Tk, Label, Scale, Button, Text, Checkbutton, messagebox
+
 
 import matplotlib.pyplot as plt
 from PIL import ImageTk, Image, ImageDraw, ImageOps
@@ -24,8 +25,10 @@ class App:
         self.rotationDelta = 5
         self.useFilter = True
 
+        self.isRecFinished = False
+
         self.maxImageDisplayWidth = 400
-        self.maxImageDisplayHeight = 400
+        self.maxImageDisplayHeight = 600
 
         self.window = Tk()
         self.window.title('computed tomography scan simulator')
@@ -111,8 +114,6 @@ class App:
         commentlabel.grid(column=0, row=10)
         self.commenttxt.grid(column=0, row=11)
 
-
-
         applyParamsButton.grid(column=2, row=3)
         generateButton.grid(column=2, row=4)
         nextIterationButton.grid(column=2, row=5)
@@ -166,6 +167,7 @@ class App:
         self.useFilter = not self.useFilter
 
     def applyParams(self):
+        self.isRecFinished = False
         self.radonTransformator.configAndReset(startRotation=np.radians(self.startRotation),
                                                numberOfEmitters=self.numberOfEmitters,
                                                emittersAngularSpan=np.radians(self.emittersAngularSpan),
@@ -175,14 +177,17 @@ class App:
         self.showReconstruction(self.radonTransformator.getReconstruction())
 
     def generateSinogram(self):
+        self.isRecFinished = False
         self.radonTransformator.generateSinogram()
         self.showSinogram(self.radonTransformator.getSinogram())
         self.radonTransformator.generateReconstruction(from_iteration=0)  # rekonstrukcja obrazu
         self.showReconstruction(self.radonTransformator.getReconstruction())
 
+        self.isRecFinished = True
         self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
 
     def runAnimation(self):
+        self.isRecFinished = False
         while self.radonTransformator.nextIteration() > 0:
             self.showSinogram(self.radonTransformator.getSinogram())
             self.window.update()
@@ -190,16 +195,21 @@ class App:
         while self.radonTransformator.nextReconstructionIteration() > 0:
             self.showReconstruction(self.radonTransformator.getReconstruction())
             self.window.update()
-
+        self.isRecFinished = True
         self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
 
     def createDicom(self):
+        if self.isRecFinished==False:
+            messagebox.showinfo(title="Error creating DICOM", message="Image reconstruction isn't finished yet!")
+            return
         patient_data = {}
         patient_data['PatientName'] = self.nametxt.get("1.0", 'end-1c') # czytaj od: 1 - pierwsza linia, 0 - pierwszy znak, -1c usun \n na koncu
         patient_data['PatientID'] = self.idtxt.get("1.0", 'end-1c')
         patient_data['StudyDate'] = self.datetxt.get("1.0", 'end-1c')
         patient_data['ImageComments'] = self.commenttxt.get("1.0", 'end-1c')
         self.save_as_dicom('test.dcm', self.radonTransformator.getReconstruction(),patient_data)
+
+        messagebox.showinfo(title="Success", message="DICOM file created")
 
     def read_dicom(self, file_name):
         # load dicom file
