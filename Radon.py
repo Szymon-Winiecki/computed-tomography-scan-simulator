@@ -33,17 +33,17 @@ class Radon:
         self.radonmatrix = np.zeros((self.numberOfEmitters, self.numberOfIterations))
         self.radonmatrixNorm = np.zeros((self.numberOfEmitters, self.numberOfIterations))
 
-        imgWidth = self.baseImage.size[0]
-        imgHeight = self.baseImage.size[1]
+        imgWidth = self.baseImageArray.shape[0]
+        imgHeight = self.baseImageArray.shape[1]
 
-        self.reconstrImage = np.zeros((imgWidth, imgHeight)) # reconstrukcja obrazu z sinogramu
-        self.reconstrImageNorm = np.zeros((imgWidth, imgHeight)) # reconstrukcja obrazu z sinogramu
+        self.reconstrImage = np.zeros(self.baseImageArray.shape) # reconstrukcja obrazu z sinogramu
+        self.reconstrImageNorm = self.reconstrImage.copy() # reconstrukcja obrazu z sinogramu
 
         self.imageDiagonal = np.sqrt((imgWidth * imgWidth) + (imgHeight * imgHeight))
 
         self.scannerRadius = int(self.imageDiagonal / 2)
 
-        self.imageCenter = (self.baseImage.size[0] / 2, self.baseImage.size[1] / 2)
+        self.imageCenter = (imgWidth / 2, imgHeight / 2)
         self.halfOfSpan = self.emittersAngularSpan / 2
         self.angleGapBetweenSensors = self.emittersAngularSpan / (self.numberOfEmitters - 1)
 
@@ -122,8 +122,8 @@ class Radon:
 
         err = dx - dy
 
-        w = self.baseImage.size[0]
-        h = self.baseImage.size[1]
+        w = self.baseImageArray.shape[0]
+        h = self.baseImageArray.shape[1]
 
         x = []
         y = []
@@ -171,7 +171,7 @@ class Radon:
         rotation = np.arange(self.numberOfEmitters)
         rotation = np.concatenate((rotation, rotation))
 
-        initRotation = self.startRotation + (from_iteration - 1) * self.rotationDelta - self.halfOfSpan
+        initRotation = self.startRotation + from_iteration * self.rotationDelta - self.halfOfSpan
         rotation = rotation * self.angleGapBetweenSensors + initRotation
         rotation[self.numberOfEmitters:] += np.pi
 

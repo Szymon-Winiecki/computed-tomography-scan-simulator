@@ -25,13 +25,13 @@ class App:
         self.useFilter = True
 
         self.maxImageDisplayWidth = 400
-        self.maxImageDisplayHeight = 600
+        self.maxImageDisplayHeight = 400
 
         self.window = Tk()
         self.window.title('computed tomography scan simulator')
         self.window.geometry('1500x1000')
 
-        self.baseImage = Image.open('example_images/Shepp_logan.jpg')
+        self.baseImage = Image.open('example_images/CT_ScoutView.jpg')
 
         # save original image size
         self.originalImage = self.baseImage
