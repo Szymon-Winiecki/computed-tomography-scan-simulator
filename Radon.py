@@ -86,7 +86,6 @@ class Radon:
             for i in range(self.numberOfEmitters):
                 points = self.bresenham(int(x[i]), int(y[i]), int(x[last - i]), int(y[last - i]))
                 self.radonmatrix[i, iter] = self.sumPixels(points, self.baseImageArray)
-            last = len(x) - 1
 
             self.currentSinogramIteration += 1
 
@@ -190,7 +189,7 @@ class Radon:
             self.currentReconstructionIteration += 1
 
         # normalizacja
-        self.reconstrImageNorm = 255 * self.reconstrImage / np.max(self.reconstrImage)
+        self.reconstrImageNorm = self.reconstrImage / (np.max(self.reconstrImage) / 255)
 
         print("reconstruction: ", (time.time() - s_time))
 

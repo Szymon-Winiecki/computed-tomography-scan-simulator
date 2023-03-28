@@ -1,4 +1,4 @@
-from tkinter import Tk, Label, Scale, Button, Text, Checkbutton, messagebox
+from tkinter import Tk, Label, Scale, Button, Text, Checkbutton, messagebox, Entry, StringVar
 
 
 import matplotlib.pyplot as plt
@@ -57,19 +57,41 @@ class App:
         self.recImgLabel = Label(self.window, image=self.recImg)
         self.recImgLabel.grid(column=4, row=0, columnspan=2)
 
-        # Sliders
-        startRotationSlider = Scale(self.window, from_=0, to=360, orient='horizontal', label='początkowa rotacja',
-                                    command=self.changeRotation)
-        startRotationSlider.set(self.startRotation)
-        spanSlider = Scale(self.window, from_=0, to=180, orient='horizontal', label='angular span',
-                           command=self.changeEmittersAngularSpan)
-        spanSlider.set(self.emittersAngularSpan)
-        countSlider = Scale(self.window, from_=0, to=1000, resolution=2, orient='horizontal', label='ilość emiterów',
-                            command=self.changeNumberOfEmitters)
-        countSlider.set(self.numberOfEmitters)
-        rotationDeltaSlider = Scale(self.window, from_=0.5, to=90, resolution=0.5, orient='horizontal', label='Δα',
-                                    command=self.changeRotationDelta)
-        rotationDeltaSlider.set(self.rotationDelta)
+        # # Sliders
+        # startRotationSlider = Scale(self.window, from_=0, to=360, orient='horizontal', label='początkowa rotacja', length=300,
+        #                             command=self.changeRotation)
+        # startRotationSlider.set(self.startRotation)
+        # spanSlider = Scale(self.window, from_=0, to=270, resolution=5, orient='horizontal', label='angular span', length=300,
+        #                    command=self.changeEmittersAngularSpan)
+        # spanSlider.set(self.emittersAngularSpan)
+        # countSlider = Scale(self.window, from_=10, to=1000, resolution=10, orient='horizontal', label='ilość emiterów', length=300,
+        #                     command=self.changeNumberOfEmitters)
+        # countSlider.set(self.numberOfEmitters)
+        # rotationDeltaSlider = Scale(self.window, from_=0.25, to=180, resolution=0.25, orient='horizontal', label='Δα', length=300,
+        #                             command=self.changeRotationDelta)
+        # rotationDeltaSlider.set(self.rotationDelta)
+
+        # Inputs
+
+        startRotationLabel = Label(self.window, text='początkowa rotacja')
+        self.startRotationVar = StringVar()
+        startRotationInput = Entry(self.window, textvariable=self.startRotationVar)
+        self.startRotationVar.set(self.startRotation)
+
+        spanLabel = Label(self.window, text='rozpiętość kątowa')
+        self.spanVar = StringVar()
+        spanInput = Entry(self.window, textvariable=self.spanVar)
+        self.spanVar.set(self.emittersAngularSpan)
+
+        countLabel = Label(self.window, text='ilość emiterów')
+        self.countVar = StringVar()
+        countInput = Entry(self.window, textvariable=self.countVar)
+        self.countVar.set(self.numberOfEmitters)
+
+        rotationDeltaLabel = Label(self.window, text='Δα')
+        self.rotationDeltaVar = StringVar()
+        rotationDeltaInput = Entry(self.window, textvariable=self.rotationDeltaVar)
+        self.rotationDeltaVar.set(self.rotationDelta)
 
         filterCheckBox = Checkbutton(self.window, text='filtruj sinogram', onvalue=1, offvalue=0, command=self.changeFilter)
         filterCheckBox.select()
@@ -99,24 +121,38 @@ class App:
         # przycisk do zapisu dicom - pojawia sie po wygenerowaniu sinogramu (po wywolaniu self.applyParams)
         self.createDicomButton = Button(self.window, text="stwórz dicom", command=self.createDicom)
 
-        startRotationSlider.grid(column=0, row=1)
-        spanSlider.grid(column=1, row=1)
-        countSlider.grid(column=2, row=1)
-        rotationDeltaSlider.grid(column=0, row=2)
-        filterCheckBox.grid(column=1, row=2)
+        # startRotationSlider.grid(column=0, row=1, columnspan=3)
+        # spanSlider.grid(column=0, row=2, columnspan=3)
+        # countSlider.grid(column=0, row=3, columnspan=3)
+        # rotationDeltaSlider.grid(column=0, row=4, columnspan=3)
 
-        namelabel.grid(column=0,row=4)
-        self.nametxt.grid(column=0, row=5)
-        idlabel.grid(column=0, row=6)
-        self.idtxt.grid(column=0, row=7)
-        datelabel.grid(column=0, row=8)
-        self.datetxt.grid(column=0, row=9)
-        commentlabel.grid(column=0, row=10)
-        self.commenttxt.grid(column=0, row=11)
+        startRotationLabel.grid(column=0, row=1, columnspan=3)
+        startRotationInput.grid(column=1, row=1, columnspan=3)
 
-        applyParamsButton.grid(column=2, row=3)
-        generateButton.grid(column=2, row=4)
-        nextIterationButton.grid(column=2, row=5)
+        spanLabel.grid(column=0, row=2, columnspan=3)
+        spanInput.grid(column=1, row=2, columnspan=3)
+
+        countLabel.grid(column=0, row=3, columnspan=3)
+        countInput.grid(column=1, row=3, columnspan=3)
+
+        rotationDeltaLabel.grid(column=0, row=4, columnspan=3)
+        rotationDeltaInput.grid(column=1, row=4, columnspan=3)
+
+        filterCheckBox.grid(column=1, row=5, columnspan=3)
+
+
+        namelabel.grid(column=0,row=6)
+        self.nametxt.grid(column=0, row=7)
+        idlabel.grid(column=0, row=8)
+        self.idtxt.grid(column=0, row=9)
+        datelabel.grid(column=0, row=10)
+        self.datetxt.grid(column=0, row=11)
+        commentlabel.grid(column=0, row=12)
+        self.commenttxt.grid(column=0, row=13)
+
+        applyParamsButton.grid(column=2, row=5)
+        generateButton.grid(column=2, row=6)
+        nextIterationButton.grid(column=2, row=7)
 
         self.radonTransformator = Radon(self.baseImage)
 
@@ -168,6 +204,19 @@ class App:
 
     def applyParams(self):
         self.isRecFinished = False
+
+        self.startRotation = int(self.startRotationVar.get())
+        self.startRotationVar.set(self.startRotation)
+
+        self.numberOfEmitters = int(self.countVar.get())
+        self.countVar.set(self.numberOfEmitters)
+
+        self.emittersAngularSpan = int(self.spanVar.get())
+        self.spanVar.set(self.emittersAngularSpan)
+
+        self.rotationDelta = float(self.rotationDeltaVar.get())
+        self.rotationDeltaVar.set(self.rotationDelta)
+
         self.radonTransformator.configAndReset(startRotation=np.radians(self.startRotation),
                                                numberOfEmitters=self.numberOfEmitters,
                                                emittersAngularSpan=np.radians(self.emittersAngularSpan),
