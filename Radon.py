@@ -215,5 +215,14 @@ class Radon:
         return filtered
     
     
+    def getMSE(self):
+        mse = 0
 
-    
+        imgWidth = self.baseImageArray.shape[0]
+        imgHeight = self.baseImageArray.shape[1]
+
+        for i in range(imgWidth):
+            for j in range(imgHeight):
+                mse += (self.reconstrImageNorm[i][j] - self.baseImageArray[i][j])**2
+        mse = mse/(imgWidth*imgHeight)
+        print("MSE =",mse)

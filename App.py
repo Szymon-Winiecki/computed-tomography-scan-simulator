@@ -182,6 +182,7 @@ class App:
         self.showSinogram(self.radonTransformator.getSinogram())
         self.radonTransformator.generateReconstruction(from_iteration=0)  # rekonstrukcja obrazu
         self.showReconstruction(self.radonTransformator.getReconstruction())
+        self.radonTransformator.getMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
         self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
@@ -195,6 +196,8 @@ class App:
         while self.radonTransformator.nextReconstructionIteration() > 0:
             self.showReconstruction(self.radonTransformator.getReconstruction())
             self.window.update()
+        self.radonTransformator.getMSE()  # oblicz blad sredniokwadratowy
+
         self.isRecFinished = True
         self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
 
