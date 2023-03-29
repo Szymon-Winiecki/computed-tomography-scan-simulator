@@ -66,7 +66,7 @@ class Radon:
     # calculates sinogram using Radon Transform from 'from_iteration' inclusive to 'to_iteration' exclusive
     def generateSinogram(self, from_iteration=None, to_iteration=None):
 
-        s_time = time.time()
+        # s_time = time.time()
 
         if from_iteration == None:
             from_iteration = self.currentSinogramIteration
@@ -103,7 +103,7 @@ class Radon:
             tmpRadon = self.radonmatrix.copy()
         self.radonmatrixNorm = tmpRadon / (np.max(tmpRadon) / 255)
 
-        print("sinogram: ", (time.time() - s_time))
+        # print("sinogram: ", (time.time() - s_time))
 
     def nextIteration(self, count=1):
         prev = self.currentSinogramIteration
@@ -119,7 +119,7 @@ class Radon:
     def bresenham(self, x0, y0, x1, y1, w, h):
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
-        # wybieranie znaku dla x i y
+
         if x0 > x1:
             sx = -1
         else:
@@ -163,7 +163,7 @@ class Radon:
     # calculates image reconstruction using Inverse Radon Transform
     def generateReconstruction(self, from_iteration=None, to_iteration=None):
 
-        s_time = time.time()
+        # s_time = time.time()
 
         if from_iteration == None:
             from_iteration = self.currentReconstructionIteration
@@ -188,7 +188,6 @@ class Radon:
             y = self.reconstrRadius * np.sin(rotation) + self.reconstrCenter[1]
 
             last = len(x) - 1
-            # emitters and detectors
             for i in range(self.numberOfEmitters):
                 points = self.bresenham(int(x[i]), int(y[i]), int(x[last - i]), int(y[last - i]), self.reconstrImage.shape[0], self.reconstrImage.shape[1])
                 self.reconstrImage[points[0], points[1]] += self.radonmatrixNorm[i, iter]
@@ -197,7 +196,7 @@ class Radon:
 
         self.reconstrImageNorm = self.reconstrImage / (np.max(self.reconstrImage) / 255)
 
-        print("reconstruction: ", (time.time() - s_time))
+        # print("reconstruction: ", (time.time() - s_time))
 
     def rampFilter(self, size):
         n = np.concatenate((
@@ -235,4 +234,5 @@ class Radon:
                 rmse += (reconstr[i][j] - self.baseImageArray[i][j])**2
         rmse = rmse/(imgWidth*imgHeight)
         rmse = np.sqrt(rmse)
+        
         print("RMSE =",rmse)

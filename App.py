@@ -52,6 +52,11 @@ class App:
         self.recImgLabel = Label(self.window, image=self.recImg)
         self.recImgLabel.grid(column=4, row=0, columnspan=2)
 
+
+        # computation status
+
+        self.statusLabel = Label(self.window, text="", font='Helvetica 18 bold')
+
         # file selction
         selectFileTitleLabel = Label(self.window, text="Wybór pliku:", font='Helvetica 18 bold')
         selectFileButton = Button(self.window, text="wybierz obraz wejściowy", command=self.selectFile)
@@ -119,6 +124,9 @@ class App:
 
 
         # layout
+
+        self.statusLabel.grid(column=4, row=2)
+
         selectFileTitleLabel.grid(column=0, row = 1, sticky='W')
         selectFileButton.grid(column=1, row = 2)
         self.selectedFileNameLabel.grid(column=2, row=2)
@@ -202,21 +210,6 @@ class App:
             self.radonTransformator = Radon(baseImage=self.baseImage)
             self.applyParams()
 
-    def changeRotation(self, event):
-        self.startRotation = int(event)
-
-    def changeNumberOfEmitters(self, event):
-        self.numberOfEmitters = int(event)
-
-    def changeEmittersAngularSpan(self, event):
-        self.emittersAngularSpan = int(event)
-
-    def changeIteration(self, event):
-        self.currentIteration = int(event)
-
-    def changeRotationDelta(self, event):
-        self.rotationDelta = float(event)
-
     def changeFilter(self):
         self.useFilter = not self.useFilter
 
@@ -243,20 +236,32 @@ class App:
         self.showSinogram(self.radonTransformator.getSinogram())
         self.showReconstruction(self.radonTransformator.getReconstruction())
 
+    # call this function with complete=False, when computations starts, and with complete=True when computation finished
+    def setStatusComplete(self, complete):
+        if complete:
+            self.statusLabel.config(text="Przetwarzanie zakończone")
+            self.isRecFinished = True
+            self.createDicomButton.grid(column=2, row=14) # show DICOM save button
+        else:
+            self.statusLabel.config(text="Przetwarzanie w toku")
+            self.isRecFinished = False
+
     def generateSinogram(self):
-        self.isRecFinished = False
+        self.setStatusComplete(False)
+        self.window.update()
+        
         self.radonTransformator.generateSinogram()
         self.showSinogram(self.radonTransformator.getSinogram())
-        self.radonTransformator.generateReconstruction(from_iteration=0)  # rekonstrukcja obrazu
+        self.radonTransformator.generateReconstruction(from_iteration=0)
         self.showReconstruction(self.radonTransformator.getReconstruction())
-        self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
-        self.isRecFinished = True
+        # self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
-        self.createDicomButton.grid(column=2, row=14) # pokaz przycisk do zapisu dicom
+        self.setStatusComplete(True)
 
     def runAnimation(self):
-        self.isRecFinished = False
+        self.setStatusComplete(False)
+
         while self.radonTransformator.nextIteration() > 0:
             self.showSinogram(self.radonTransformator.getSinogram())
             self.window.update()
@@ -264,17 +269,17 @@ class App:
         while self.radonTransformator.nextReconstructionIteration() > 0:
             self.showReconstruction(self.radonTransformator.getReconstruction())
             self.window.update()
-        self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
-        self.isRecFinished = True
+        # self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
-        self.createDicomButton.grid(column=2, row=14) # pokaz przycisk do zapisu dicom
+        self.setStatusComplete(True)
+
 
     # DICOM handling
 
     def createDicom(self):
         if self.isRecFinished==False:
-            messagebox.showinfo(title="Error creating DICOM", message="Image reconstruction isn't finished yet!")
+            messagebox.showinfo(title="Error creating DICOM", message="Przetwarzanie obrazu jeszcze się nie zakończyło!")
             return
 
         patient_data = {}
@@ -284,14 +289,14 @@ class App:
         patient_data['ImageComments'] = self.commenttxt.get("1.0", 'end-1c')
 
         if patient_data['PatientName'] == "" or patient_data['PatientID'] == "":
-            messagebox.showinfo(title="Input error", message="Enter patient name and id")
+            messagebox.showinfo(title="Input error", message="Podaj nazwisko i id klienta")
         elif not patient_data['StudyDate'].isdigit():
-            messagebox.showinfo(title="Input error", message="Date should be in the format YYYYMMDD")
+            messagebox.showinfo(title="Input error", message="data powinna być podana w formacie YYYYMMDD")
         else:
             filename = self.filenametxt.get("1.0", 'end-1c')
             self.save_as_dicom(filename + '.dcm', self.radonTransformator.getReconstruction(),patient_data)
 
-            messagebox.showinfo(title="Success", message="DICOM file created")
+            messagebox.showinfo(title="Success", message="utworzono plik DICOM")
 
     def read_dicom(self, file_name):
         # load dicom file
@@ -356,6 +361,9 @@ class App:
         ds.save_as(file_name, write_like_original=False)
 
         self.read_dicom(file_name)
+
+
+    # input validation
 
     def validate_rotationDeltaInput(self, val):
         if val.isdigit() and int(val)>0 and int(val)<180:
