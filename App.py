@@ -1,10 +1,7 @@
 from tkinter import Tk, Label, Scale, Button, Text, Checkbutton, messagebox, Entry, StringVar
 
-
-import matplotlib.pyplot as plt
 from PIL import ImageTk, Image, ImageDraw, ImageOps
 import numpy as np
-import time
 
 from Radon import Radon
 
@@ -12,35 +9,34 @@ from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import ExplicitVRLittleEndian
 import pydicom._storage_sopclass_uids
 
-from skimage.util import img_as_ubyte
-from skimage.exposure import rescale_intensity
-
 
 class App:
 
     def __init__(self):
+
+        # variables to hold computations settings
         self.startRotation = 0
         self.numberOfEmitters = 10
         self.emittersAngularSpan = 90
         self.rotationDelta = 5
         self.useFilter = True
 
+        
         self.isRecFinished = False
 
+        #display settings
         self.maxImageDisplayWidth = 400
         self.maxImageDisplayHeight = 600
 
+
+        # window
         self.window = Tk()
         self.window.title('computed tomography scan simulator')
-        self.window.geometry('1500x1000')
+        self.window.geometry('1600x1000')
 
-        self.baseImage = Image.open('example_images/CT_ScoutView.jpg')
+        self.baseImage = Image.open('example_images/Shepp_logan.jpg')
 
-        # save original image size
-        self.originalImage = self.baseImage
-        self.imgWidth = self.baseImage.width
-        self.imgHeight = self.baseImage.height
-
+        # place for original image 
         self.img = ImageTk.PhotoImage(self.resizeToFitLimits(self.baseImage))
         self.imgLabel = Label(self.window, image=self.img)
         self.imgLabel.grid(column=0, row=0, columnspan=2)
@@ -57,22 +53,7 @@ class App:
         self.recImgLabel = Label(self.window, image=self.recImg)
         self.recImgLabel.grid(column=4, row=0, columnspan=2)
 
-        # # Sliders
-        # startRotationSlider = Scale(self.window, from_=0, to=360, orient='horizontal', label='początkowa rotacja', length=300,
-        #                             command=self.changeRotation)
-        # startRotationSlider.set(self.startRotation)
-        # spanSlider = Scale(self.window, from_=0, to=270, resolution=5, orient='horizontal', label='angular span', length=300,
-        #                    command=self.changeEmittersAngularSpan)
-        # spanSlider.set(self.emittersAngularSpan)
-        # countSlider = Scale(self.window, from_=10, to=1000, resolution=10, orient='horizontal', label='ilość emiterów', length=300,
-        #                     command=self.changeNumberOfEmitters)
-        # countSlider.set(self.numberOfEmitters)
-        # rotationDeltaSlider = Scale(self.window, from_=0.25, to=180, resolution=0.25, orient='horizontal', label='Δα', length=300,
-        #                             command=self.changeRotationDelta)
-        # rotationDeltaSlider.set(self.rotationDelta)
-
         # Inputs
-
         startRotationLabel = Label(self.window, text='początkowa rotacja')
         self.startRotationVar = StringVar()
         startRotationInput = Entry(self.window, textvariable=self.startRotationVar)
@@ -99,13 +80,13 @@ class App:
         # Button to apply settings and reset generated images
         applyParamsButton = Button(self.window, text="zastosuj i resetuj sinogram", command=self.applyParams)
 
-        # Button to create entire sinogram and reconstr
+        # Button to create entire sinogram and reconstruction at once
         generateButton = Button(self.window, text="Wygeneruj", command=self.generateSinogram)
 
-        # Button to render next iteration
+        # Button to render sinogram and reconstruction iteration by iteration
         nextIterationButton = Button(self.window, text="rysuj iteracyjnie", command=self.runAnimation)
 
-        # Textboxes - nie maja sprawdzania poprawnosci ani nic
+        # DICOM info inputs
         namelabel = Label(self.window, text = "Patient Name")
         self.nametxt = Text(self.window,height=1,width=10)
 
@@ -118,13 +99,11 @@ class App:
         commentlabel = Label(self.window, text="Comments")
         self.commenttxt = Text(self.window, height=2, width=20)
 
-        # przycisk do zapisu dicom - pojawia sie po wygenerowaniu sinogramu (po wywolaniu self.applyParams)
+        # button to save DICOM
         self.createDicomButton = Button(self.window, text="stwórz dicom", command=self.createDicom)
 
-        # startRotationSlider.grid(column=0, row=1, columnspan=3)
-        # spanSlider.grid(column=0, row=2, columnspan=3)
-        # countSlider.grid(column=0, row=3, columnspan=3)
-        # rotationDeltaSlider.grid(column=0, row=4, columnspan=3)
+
+        # layout
 
         startRotationLabel.grid(column=0, row=1, columnspan=3)
         startRotationInput.grid(column=1, row=1, columnspan=3)
@@ -150,14 +129,17 @@ class App:
         commentlabel.grid(column=0, row=12)
         self.commenttxt.grid(column=0, row=13)
 
-        applyParamsButton.grid(column=2, row=5)
-        generateButton.grid(column=2, row=6)
-        nextIterationButton.grid(column=2, row=7)
+        applyParamsButton.grid(column=2, row=6)
+        generateButton.grid(column=2, row=7)
+        nextIterationButton.grid(column=2, row=8)
 
+
+        # create object that takes care of all CT computations
         self.radonTransformator = Radon(self.baseImage)
 
         self.window.mainloop()
 
+    # returns image resized to fit in limits set in maxImageDisplayWidth and maxImageDisplayHeight variables
     def resizeToFitLimits(self, image):
         newShape = (0, 0)
         if image.size[0] > image.size[1]:
@@ -167,22 +149,23 @@ class App:
 
         return image.resize(newShape, resample=Image.BICUBIC)
 
-    def loadImage(self, filepath):
-        self.baseImage = Image.open(filepath)
-        self.img = ImageTk.PhotoImage(self.resizeToFitLimits(self.baseImage))
-        self.imgLabel.config(image=self.img)
-
+    # display original image
     def setImage(self, image):
         self.img = ImageTk.PhotoImage(self.resizeToFitLimits(image))
         self.imgLabel.config(image=self.img)
 
+    # display sinogram
     def showSinogram(self, sinogram):
         self.sinImg = ImageTk.PhotoImage(self.resizeToFitLimits(sinogram))
         self.sinImgLabel.config(image=self.sinImg)
 
+    # display reconstructed image
     def showReconstruction(self, reconstruction):
         self.recImg = ImageTk.PhotoImage(self.resizeToFitLimits(reconstruction))
         self.recImgLabel.config(image=self.recImg)
+    
+
+    # event handlers
 
     def changeRotation(self, event):
         self.startRotation = int(event)
@@ -231,7 +214,7 @@ class App:
         self.showSinogram(self.radonTransformator.getSinogram())
         self.radonTransformator.generateReconstruction(from_iteration=0)  # rekonstrukcja obrazu
         self.showReconstruction(self.radonTransformator.getReconstruction())
-        self.radonTransformator.getMSE()  # oblicz blad sredniokwadratowy
+        self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
         self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
@@ -245,10 +228,12 @@ class App:
         while self.radonTransformator.nextReconstructionIteration() > 0:
             self.showReconstruction(self.radonTransformator.getReconstruction())
             self.window.update()
-        self.radonTransformator.getMSE()  # oblicz blad sredniokwadratowy
+        self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
         self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
+
+    # DICOM handling
 
     def createDicom(self):
         if self.isRecFinished==False:
