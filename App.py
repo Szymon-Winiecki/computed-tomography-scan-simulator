@@ -221,7 +221,7 @@ class App:
         self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
-        self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
+        self.createDicomButton.grid(column=0, row=14) # pokaz przycisk do zapisu dicom
 
     def runAnimation(self):
         self.isRecFinished = False
@@ -235,7 +235,7 @@ class App:
         self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
-        self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
+        self.createDicomButton.grid(column=0, row=14) # pokaz przycisk do zapisu dicom
 
     # DICOM handling
 
