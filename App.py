@@ -370,7 +370,7 @@ class App:
             return True
         return False
     def validate_countInput(self, val):
-        if val.isdigit() and float(val)>=1 and float(val)<1000:
+        if val.isdigit() and int(val)>=1 and int(val)<1000:
             return True
         return False
 
