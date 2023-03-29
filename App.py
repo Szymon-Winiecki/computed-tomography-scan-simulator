@@ -1,4 +1,4 @@
-from tkinter import Tk, Label, Scale, Button, Text, Checkbutton, messagebox, Entry, StringVar
+from tkinter import Tk, Label, Scale, Button, Text, Checkbutton, messagebox, Entry, StringVar, filedialog
 
 from PIL import ImageTk, Image, ImageDraw, ImageOps
 import numpy as np
@@ -34,9 +34,8 @@ class App:
         self.window.title('computed tomography scan simulator')
         self.window.geometry('1600x1000')
 
-        self.baseImage = Image.open('example_images/Shepp_logan.jpg')
-
         # place for original image 
+        self.baseImage = Image.open('example_images/Shepp_logan.jpg')
         self.img = ImageTk.PhotoImage(self.resizeToFitLimits(self.baseImage))
         self.imgLabel = Label(self.window, image=self.img)
         self.imgLabel.grid(column=0, row=0, columnspan=2)
@@ -53,7 +52,14 @@ class App:
         self.recImgLabel = Label(self.window, image=self.recImg)
         self.recImgLabel.grid(column=4, row=0, columnspan=2)
 
+        # file selction
+        selectFileTitleLabel = Label(self.window, text="Wybór pliku:", font='Helvetica 18 bold')
+        selectFileButton = Button(self.window, text="wybierz obraz wejściowy", command=self.selectFile)
+        self.selectedFileNameLabel = Label(self.window, text="nie wybrano pliku")
+
         # Inputs
+        settingsTitleLabel = Label(self.window, text="Opcje:", font='Helvetica 18 bold')
+
         startRotationLabel = Label(self.window, text='początkowa rotacja')
         self.startRotationVar = StringVar()
         startRotationInput = Entry(self.window, textvariable=self.startRotationVar)
@@ -78,60 +84,72 @@ class App:
         filterCheckBox.select()
 
         # Button to apply settings and reset generated images
-        applyParamsButton = Button(self.window, text="zastosuj i resetuj sinogram", command=self.applyParams)
+        applyParamsButton = Button(self.window, text="zastosuj i resetuj sinogram", width=25, command=self.applyParams)
 
         # Button to create entire sinogram and reconstruction at once
-        generateButton = Button(self.window, text="Wygeneruj", command=self.generateSinogram)
+        generateButton = Button(self.window, text="Wygeneruj", width=25, command=self.generateSinogram)
 
         # Button to render sinogram and reconstruction iteration by iteration
-        nextIterationButton = Button(self.window, text="rysuj iteracyjnie", command=self.runAnimation)
+        nextIterationButton = Button(self.window, text="rysuj iteracyjnie", width=25, command=self.runAnimation)
 
         # DICOM info inputs
-        namelabel = Label(self.window, text = "Patient Name")
-        self.nametxt = Text(self.window,height=1,width=10)
+        dicomTitleLabel = Label(self.window, text="Eksport do pliku DICOM:", font='Helvetica 18 bold')
 
-        idlabel = Label(self.window, text="Patient ID")
-        self.idtxt = Text(self.window, height=1, width=10)
+        namelabel = Label(self.window, text = "Imię i nazwisko pacjenta: ")
+        self.nametxt = Text(self.window,height=1,width=20)
 
-        datelabel = Label(self.window, text="Study Date") # powinna byc w formacie YYYYMMDD (ze same liczby po prostu), inaczej wywala warning, ale i tak sie zapisuje
-        self.datetxt = Text(self.window, height=1, width=10)
+        idlabel = Label(self.window, text="ID pacjenta")
+        self.idtxt = Text(self.window, height=1, width=20)
 
-        commentlabel = Label(self.window, text="Comments")
+        datelabel = Label(self.window, text="Data badania") # format: YYYYMMDD
+        self.datetxt = Text(self.window, height=1, width=20)
+
+        commentlabel = Label(self.window, text="komentarz")
         self.commenttxt = Text(self.window, height=2, width=20)
+
+        filenamelabel = Label(self.window, text="nazwa pliku")
+        self.filenametxt = Text(self.window, height=1, width=20)
 
         # button to save DICOM
         self.createDicomButton = Button(self.window, text="stwórz dicom", command=self.createDicom)
 
 
         # layout
+        selectFileTitleLabel.grid(column=0, row = 1, sticky='W')
+        selectFileButton.grid(column=1, row = 2)
+        self.selectedFileNameLabel.grid(column=2, row=2)
 
-        startRotationLabel.grid(column=0, row=1, columnspan=3)
-        startRotationInput.grid(column=1, row=1, columnspan=3)
+        settingsTitleLabel.grid(column=0, row=3, sticky='W')
 
-        spanLabel.grid(column=0, row=2, columnspan=3)
-        spanInput.grid(column=1, row=2, columnspan=3)
+        startRotationLabel.grid(column=0, row=4)
+        startRotationInput.grid(column=1, row=4)
 
-        countLabel.grid(column=0, row=3, columnspan=3)
-        countInput.grid(column=1, row=3, columnspan=3)
+        spanLabel.grid(column=0, row=5)
+        spanInput.grid(column=1, row=5)
 
-        rotationDeltaLabel.grid(column=0, row=4, columnspan=3)
-        rotationDeltaInput.grid(column=1, row=4, columnspan=3)
+        countLabel.grid(column=0, row=6)
+        countInput.grid(column=1, row=6)
 
-        filterCheckBox.grid(column=1, row=5, columnspan=3)
+        rotationDeltaLabel.grid(column=0, row=7)
+        rotationDeltaInput.grid(column=1, row=7)
 
+        filterCheckBox.grid(column=1, row=8)
 
-        namelabel.grid(column=0,row=6)
-        self.nametxt.grid(column=0, row=7)
-        idlabel.grid(column=0, row=8)
-        self.idtxt.grid(column=0, row=9)
-        datelabel.grid(column=0, row=10)
-        self.datetxt.grid(column=0, row=11)
-        commentlabel.grid(column=0, row=12)
-        self.commenttxt.grid(column=0, row=13)
+        applyParamsButton.grid(column=3, row=5, sticky='W')
+        generateButton.grid(column=3, row=6, sticky='W')
+        nextIterationButton.grid(column=3, row=7, sticky='W')
 
-        applyParamsButton.grid(column=2, row=6)
-        generateButton.grid(column=2, row=7)
-        nextIterationButton.grid(column=2, row=8)
+        dicomTitleLabel.grid(column=0,row=9, sticky='W')
+        namelabel.grid(column=0,row=10)
+        self.nametxt.grid(column=1, row=10)
+        idlabel.grid(column=0, row=11)
+        self.idtxt.grid(column=1, row=11)
+        datelabel.grid(column=0, row=12)
+        self.datetxt.grid(column=1, row=12)
+        commentlabel.grid(column=0, row=13)
+        self.commenttxt.grid(column=1, row=13)
+        filenamelabel.grid(column=0, row=14)
+        self.filenametxt.grid(column=1, row=14)
 
 
         # create object that takes care of all CT computations
@@ -166,6 +184,19 @@ class App:
     
 
     # event handlers
+
+    def selectFile(self):
+        filename = filedialog.askopenfilename()
+
+        if filename != '':
+            self.inputImageFile = filename
+            self.selectedFileNameLabel.config(text=filename[filename.rindex('/')+1:])
+            del self.radonTransformator
+
+            self.baseImage = Image.open(filename)
+            self.setImage(self.baseImage)
+            self.radonTransformator = Radon(baseImage=self.baseImage)
+            self.applyParams()
 
     def changeRotation(self, event):
         self.startRotation = int(event)
@@ -217,7 +248,7 @@ class App:
         self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
-        self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
+        self.createDicomButton.grid(column=2, row=14) # pokaz przycisk do zapisu dicom
 
     def runAnimation(self):
         self.isRecFinished = False
@@ -231,7 +262,7 @@ class App:
         self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
-        self.createDicomButton.grid(column=0, row=12) # pokaz przycisk do zapisu dicom
+        self.createDicomButton.grid(column=2, row=14) # pokaz przycisk do zapisu dicom
 
     # DICOM handling
 
@@ -244,7 +275,9 @@ class App:
         patient_data['PatientID'] = self.idtxt.get("1.0", 'end-1c')
         patient_data['StudyDate'] = self.datetxt.get("1.0", 'end-1c')
         patient_data['ImageComments'] = self.commenttxt.get("1.0", 'end-1c')
-        self.save_as_dicom('test.dcm', self.radonTransformator.getReconstruction(),patient_data)
+
+        filename = self.filenametxt.get("1.0", 'end-1c')
+        self.save_as_dicom(filename + '.dcm', self.radonTransformator.getReconstruction(),patient_data)
 
         messagebox.showinfo(title="Success", message="DICOM file created")
 
