@@ -366,19 +366,29 @@ class App:
     # input validation
 
     def validate_rotationDeltaInput(self, val):
-        if val.isdigit() and int(val)>0 and int(val)<180:
+        if val== '':
             return True
-        return False
+        try:
+            float(val)
+            return True
+        except ValueError:
+            return False
     def validate_startRotationInput(self, val):
-        if val.isdigit() and int(val)>=0 and int(val)<=360:
+        if val== '':
+            return True
+        if val.isdigit() and int(val)>=0:
             return True
         return False
     def validate_spanInput(self, val):
-        if val.isdigit() and int(val)>=1 and int(val)<=100:
+        if val== '':
+            return True
+        if val.isdigit() and int(val)>=0:
             return True
         return False
     def validate_countInput(self, val):
-        if val.isdigit() and int(val)>=1 and int(val)<1000:
+        if val== '':
+            return True
+        if val.isdigit() and int(val)>=0:
             return True
         return False
 
