@@ -62,22 +62,26 @@ class App:
 
         startRotationLabel = Label(self.window, text='początkowa rotacja')
         self.startRotationVar = StringVar()
-        startRotationInput = Entry(self.window, textvariable=self.startRotationVar)
+        startRotationInput = Entry(self.window, textvariable=self.startRotationVar, validate="key")
+        startRotationInput['validatecommand'] = (startRotationInput.register(self.validate_startRotationInput), '%P')
         self.startRotationVar.set(self.startRotation)
 
         spanLabel = Label(self.window, text='rozpiętość kątowa')
         self.spanVar = StringVar()
-        spanInput = Entry(self.window, textvariable=self.spanVar)
+        spanInput = Entry(self.window, textvariable=self.spanVar, validate="key")
+        spanInput['validatecommand'] = (spanInput.register(self.validate_spanInput), '%P')
         self.spanVar.set(self.emittersAngularSpan)
 
         countLabel = Label(self.window, text='ilość emiterów')
         self.countVar = StringVar()
-        countInput = Entry(self.window, textvariable=self.countVar)
+        countInput = Entry(self.window, textvariable=self.countVar, validate="key")
+        countInput['validatecommand'] = (countInput.register(self.validate_countInput), '%P')
         self.countVar.set(self.numberOfEmitters)
 
         rotationDeltaLabel = Label(self.window, text='Δα')
         self.rotationDeltaVar = StringVar()
-        rotationDeltaInput = Entry(self.window, textvariable=self.rotationDeltaVar)
+        rotationDeltaInput = Entry(self.window, textvariable=self.rotationDeltaVar, validate="key")
+        rotationDeltaInput['validatecommand'] = (rotationDeltaInput.register(self.validate_rotationDeltaInput), '%P')
         self.rotationDeltaVar.set(self.rotationDelta)
 
         filterCheckBox = Checkbutton(self.window, text='filtruj sinogram', onvalue=1, offvalue=0, command=self.changeFilter)
@@ -248,6 +252,7 @@ class App:
         self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
+
         self.createDicomButton.grid(column=2, row=14) # pokaz przycisk do zapisu dicom
 
     def runAnimation(self):
@@ -262,6 +267,7 @@ class App:
         self.radonTransformator.getRMSE()  # oblicz blad sredniokwadratowy
 
         self.isRecFinished = True
+
         self.createDicomButton.grid(column=2, row=14) # pokaz przycisk do zapisu dicom
 
     # DICOM handling
@@ -270,16 +276,22 @@ class App:
         if self.isRecFinished==False:
             messagebox.showinfo(title="Error creating DICOM", message="Image reconstruction isn't finished yet!")
             return
+
         patient_data = {}
         patient_data['PatientName'] = self.nametxt.get("1.0", 'end-1c') # czytaj od: 1 - pierwsza linia, 0 - pierwszy znak, -1c usun \n na koncu
         patient_data['PatientID'] = self.idtxt.get("1.0", 'end-1c')
         patient_data['StudyDate'] = self.datetxt.get("1.0", 'end-1c')
         patient_data['ImageComments'] = self.commenttxt.get("1.0", 'end-1c')
 
-        filename = self.filenametxt.get("1.0", 'end-1c')
-        self.save_as_dicom(filename + '.dcm', self.radonTransformator.getReconstruction(),patient_data)
+        if patient_data['PatientName'] == "" or patient_data['PatientID'] == "":
+            messagebox.showinfo(title="Input error", message="Enter patient name and id")
+        elif not patient_data['StudyDate'].isdigit():
+            messagebox.showinfo(title="Input error", message="Date should be in the format YYYYMMDD")
+        else:
+            filename = self.filenametxt.get("1.0", 'end-1c')
+            self.save_as_dicom(filename + '.dcm', self.radonTransformator.getReconstruction(),patient_data)
 
-        messagebox.showinfo(title="Success", message="DICOM file created")
+            messagebox.showinfo(title="Success", message="DICOM file created")
 
     def read_dicom(self, file_name):
         # load dicom file
@@ -345,5 +357,21 @@ class App:
 
         self.read_dicom(file_name)
 
+    def validate_rotationDeltaInput(self, val):
+        if val.isdigit() and int(val)>0 and int(val)<180:
+            return True
+        return False
+    def validate_startRotationInput(self, val):
+        if val.isdigit() and int(val)>=0 and int(val)<=360:
+            return True
+        return False
+    def validate_spanInput(self, val):
+        if val.isdigit() and int(val)>=1 and int(val)<=100:
+            return True
+        return False
+    def validate_countInput(self, val):
+        if val.isdigit() and float(val)>=1 and float(val)<1000:
+            return True
+        return False
 
 
